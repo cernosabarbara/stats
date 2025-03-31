@@ -1,0 +1,30 @@
+Homework 4
+Complete the task listed below. You have to submit:
+
+The R or Rmd file with the code that you used
+
+The output including interpretation where requested.
+
+The data used
+
+The R files should be suitable structured (by exercises) with comments indicating exercises and additional explanations where necessary or in doubt. Make sure that the file includes code for loading any necessary packages. The file should execute in R without any errors. Try it in a new (empty) R session before submitting.
+
+Here you have two options:
+
+Analyse empirical data.
+
+Select a data-set with at least 5 variables (at least 3 should be numeric) and at least 30% of units having missing value at any of the selected variables.
+
+Speculate about the missing data mechanism (MCAR, MAR, NMAR).
+
+Use an appropriate method for missing values treatment for the following two tasks (can be different for each task):
+
+Compute confidence interval for the mean for all numeric variables.
+
+Preform a multivariate method (e.g. factor analysis, multiple regression …) using all available information.
+
+Compare these results to the results obtained using complete/available (choose one) case scenario.
+
+Interpret the results
+
+Use simulations to to estimate the reliability of selected multivariate method.

@@ -1,0 +1,14 @@
+Homework 5
+Complete the task listed below. You have to submit:
+
+The R or Rmd file with the code that you used
+
+The output including interpretation where requested.
+
+The data used
+
+The R files should be suitable structured (by exercises) with comments indicating exercises and additional explanations where necessary or in doubt. Make sure that the file includes code for loading any necessary packages. The file should execute in R without any errors. Try it in a new (empty) R session before submitting.
+
+TASK:
+
+Analyze real data (you can choose any data). Select a prediction problem (predicting either scale or categorical variable). Use at least two methods suitable for the problem you selected, of which at least one must be a data mining method. Use cross-validation to compare performance of different methods.

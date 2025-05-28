@@ -106,10 +106,27 @@ md.pattern(filtered_data) #missing data patterns (pretty blue red)
 cor_matrix <- cor(filtered_data[, numeric_vars], use = "complete.obs")
 print(cor_matrix)
 
-# Filter for top 6 high-crime countries
-top_6 <- filtered_data %>% filter(geo %in% c("Denmark", "Finland", "France", "Ireland", "Sweden", "Norway"))
 
 # PART I: Identifying change in crime rates over time
+
+# Summary statistics: mean and standard error for crime rate by country
+# I calculate mean crime rates and confidence intervals to compare countries
+tmp <- filtered_data %>%
+  group_by(geo) %>%
+  summarise(mean_crime = mean(crime, na.rm = TRUE),
+            se_crime = sd(crime, na.rm = TRUE) / sqrt(n())) %>%
+  arrange(desc(mean_crime))
+
+# Error bars plot for all countries
+# I plot mean crime rates with 95% CI to show variation across countries
+ggplot(tmp, aes(x = reorder(geo, mean_crime), y = mean_crime, 
+                ymin = mean_crime - 1.96 * se_crime, ymax = mean_crime + 1.96 * se_crime)) +
+  geom_point() +
+  geom_errorbar(width = 0.2) +
+  labs(x = "Country", y = "Mean Crime Rate (per 100,000)") +
+  ggtitle("Mean Crime Rate by Country with 95% CI") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
 # Filter for 2020–2022
 data_2020_2022 <- filtered_data %>%
@@ -139,11 +156,34 @@ comparison <- top_10_crime_rates %>%
     percent_change = (change / avg_crime_rate_2008_2009) * 100
   )
 
+# Filter for top 6 high-crime countries
+top_6 <- filtered_data %>% filter(geo %in% c("Denmark", "Finland", "France", "Ireland", "Sweden", "Norway"))
+
+# Calculate slopes for crime trends in top-6 countries
+# I compute slopes to identify countries with the strongest crime increases
+top_6_slopes <- top_6 %>%
+  group_by(geo) %>%
+  summarise(slope = coef(lm(crime ~ TIME_PERIOD))[2]) %>%
+  filter(slope > 0) %>%
+  arrange(desc(slope)) %>%
+  head(6)
+
+# Line chart for top-6 countries with positive slopes
+# I visualize trends for countries with the largest crime increases
+top_6_slope_data <- top_6 %>%
+  filter(geo %in% top_6_slopes$geo)
+ggplot(top_6_slope_data, aes(x = TIME_PERIOD, y = crime, color = geo)) +
+  geom_line() +
+  theme_minimal() +
+  labs(title = "Crime Rate Trends for Top-6 Countries with Positive Slopes", 
+       x = "Time Period", 
+       y = "Crime Rate (per 100,000)") +
+  theme(legend.position = "bottom") +
+  scale_color_brewer(palette = "Set3")
+
 knitr::kable(comparison, digits = 2, caption = "Crime Rate Comparison (per 100,000)")
 # I will examine the top 6 countries with the highest positive change in crime rates in my paper
 
-# Define top 6 countries 
-top_6_countries <- c("Sweden", "Norway", "Denmark", "France", "Finland", "Ireland")
 
 ggplot(top_6, aes(x = TIME_PERIOD, y = crime, color = geo, group = geo)) +
   geom_line() +
@@ -161,15 +201,6 @@ ggplot(top_6, aes(x = TIME_PERIOD, y = crime, color = geo, group = geo)) +
 # Correlation matrix for top 6 countries
 cor_matrix_top6 <- cor(top_6[, numeric_vars], use = "complete.obs")
 print(cor_matrix_top6)
-
-# Regression model for all data
-crime_model <- lm(crime ~ unemployment_ratio + edu_ratio + suspects_ratio +
-                    cumulative_immigration_pct + socialprotection, data = filtered_data)
-summary(crime_model)
-# The model for all the countries has a R-squared:  0.215 (meaning there are other variables potentially contributing to it) with socialprotection and edu_ratio being statistically significant
-
-ggplot(filtered_data, aes(x = edu_ratio, y = crime, color = geo)) +
-  geom_point() + labs(title = "Crime vs. Education Ratio (Non-EU/Domestic)")
 
 # Regression model for top 6 countries
 crime_model_top_6 <- lm(crime ~ unemployment_ratio + edu_ratio + suspects_ratio +
@@ -214,6 +245,44 @@ ggplot(top_6, aes(x = cumulative_immigration_pct, y = crime, color = unemploymen
   geom_point() + labs(title = "Crime vs. cumulative_immigration_pct (by unemployment_ratio)")
 
 
+
+# ANOVA for top-6 countries
+# I test if crime rates differ significantly across top-6 countries and key variables
+aov_crime_geo <- aov(crime ~ geo, data = top_6)
+aov_crime_suspects <- aov(crime ~ suspects_ratio, data = top_6)
+aov_crime_socialexclusion <- aov(crime ~ socialexclusion, data = top_6)
+print("ANOVA: Crime by Country")
+summary(aov_crime_geo)
+print("ANOVA: Crime by Suspects Ratio")
+summary(aov_crime_suspects)
+print("ANOVA: Crime by Social Exclusion")
+summary(aov_crime_socialexclusion)
+# Crime differs significantly across countries (p<2e-16), and suspects_ratio (p=1.03e-09) and socialexclusion (p=7.7e-09) strongly affect crime, confirming regression findings.
+
+# PCA for top-6 countries
+# I use PCA to reduce dimensions and identify key variable patterns
+pca_data <- top_6[, numeric_vars] %>% na.omit() %>% scale()
+pca_result <- prcomp(pca_data, scale. = TRUE)
+# PC1 and PC2 explain 61.41% of variance (38.05% and 23.36%), reducing dimensions and showing key patterns in crime, socialexclusion, and immigration variables.
+
+summary(pca_result)
+# Biplot to visualize countries and variables
+biplot(pca_result, main = "PCA Biplot: Top-6 Countries")
+
+# Factor Analysis for top-6 countries
+# I use FA to group variables into latent factors (e.g., integration)
+fa_data <- top_6[, numeric_vars] %>% na.omit() %>% scale()
+# Suitability checks
+KMO(fa_data)
+cortest.bartlett(cor(fa_data), n = nrow(fa_data))
+# KMO=0.52 and Bartlett’s test (p=4.4e-67) confirm FA suitability. Two factors explain 52% of variance: ML1 (crime, suspects_ratio) and ML2 (edu_ratio, socialexclusion). Fit is moderate (RMSEA=0.298), suggesting integration-related factors drive crime.
+
+fa_result <- fa(fa_data, nfactors = 2, rotate = "varimax", fm = "ml")
+print(fa_result, digits = 2)
+# Visualize factor loadings
+fa.diagram(fa_result)
+
+
 # Part 3
 # Correlation and linear regression for non-top-6 countries
 non_top_6 <- filtered_data %>% filter(!geo %in% c("Denmark", "Finland", "France", "Ireland", "Sweden", "Norway"))
@@ -227,6 +296,15 @@ crime_model_non_top_6 <- lm(crime ~ unemployment_ratio + edu_ratio + suspects_ra
                               cumulative_immigration_pct + socialexclusion, data = non_top_6)
 summary(crime_model_non_top_6)
 # The regression model explains only 10% of crime variance (R-squared: 0.1026), far less than the top-6 model (77%), indicating other factors drive crime in these countries. Significant predictors include edu_ratio, suspects_ratio, and cumulative_immigration_pct
+
+# Regression model for all data
+crime_model <- lm(crime ~ unemployment_ratio + edu_ratio + suspects_ratio +
+                    cumulative_immigration_pct + socialprotection, data = filtered_data)
+summary(crime_model)
+# The model for all the countries has a R-squared:  0.46 (meaning there are other variables potentially contributing to it) with socialprotection being statistically significant
+
+ggplot(filtered_data, aes(x = edu_ratio, y = crime, color = geo)) +
+  geom_point() + labs(title = "Crime vs. Education Ratio (Non-EU/Domestic)")
 
 # Conclusion
 # In my paper, I examined how crime rates, specifically sexual violence, relate to social factors in European countries from 2008 to 2023.

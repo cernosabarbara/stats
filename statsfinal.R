@@ -102,10 +102,6 @@ md.pattern(filtered_data) #missing data patterns (pretty blue red)
 
 #miceImp<- mice(filtered_data,m=5,maxit=10) 
 
-# Compute correlation matrix for all data
-cor_matrix <- cor(filtered_data[, numeric_vars], use = "complete.obs")
-print(cor_matrix)
-
 
 # PART I: Identifying change in crime rates over time
 
@@ -299,12 +295,51 @@ summary(crime_model_non_top_6)
 
 # Regression model for all data
 crime_model <- lm(crime ~ unemployment_ratio + edu_ratio + suspects_ratio +
-                    cumulative_immigration_pct + socialprotection, data = filtered_data)
+                    cumulative_immigration_pct , data = filtered_data)
 summary(crime_model)
-# The model for all the countries has a R-squared:  0.46 (meaning there are other variables potentially contributing to it) with socialprotection being statistically significant
+# The model for all the countries has a R-squared:  0.10 (meaning there are other variables potentially contributing to it) with socialprotection being statistically significant
 
-ggplot(filtered_data, aes(x = edu_ratio, y = crime, color = geo)) +
-  geom_point() + labs(title = "Crime vs. Education Ratio (Non-EU/Domestic)")
+
+ggplot(filtered_data, aes(x = cumulative_immigration_pct, y = crime, color = geo)) +
+  geom_point() + labs(title = "Crime vs. Cumulative_immigration_pct (Non-EU/Domestic)")
+
+
+# Calculate the median of the suspects_ratio variable
+suspects_ratio_median <- median(filtered_data$suspects_ratio, na.rm = TRUE)
+threshold <- 10 * suspects_ratio_median
+
+# Identify outliers where crime is 10 times higher than the median
+outliers <- filtered_data %>%
+  filter(suspects_ratio > threshold)
+
+# View the outliers
+print(outliers)
+
+# Remove outliers where crime is 10 times higher than the median
+filtered_data_clean <- filtered_data %>%
+  filter(suspects_ratio <= threshold)
+
+# Check the number of rows before and after to confirm removal
+nrow(filtered_data)
+nrow(filtered_data_clean)
+
+# Create the scatter plot with the cleaned data
+ggplot(filtered_data_clean, aes(x = suspects_ratio, y = crime, color = geo)) +
+  geom_point() +
+  labs(title = "Sexual Violence vs. Suspects Ratio (Non-EU/Domestic)") +
+  theme_minimal()
+
+# Correlation matrix (this part is fine, just for reference)
+cor_matrix <- cor(filtered_data[, numeric_vars], use = "complete.obs")
+print(cor_matrix)
+
+# Run the regression model using the original data frame (filtered_data), not cor_matrix
+crime_model_filtered_data <- lm(crime ~ unemployment_ratio + edu_ratio + suspects_ratio +
+                                  cumulative_immigration_pct + socialexclusion, 
+                                data = filtered_data)
+
+# View the summary of the regression model
+summary(crime_model_filtered_data)
 
 # Conclusion
 # In my paper, I examined how crime rates, specifically sexual violence, relate to social factors in European countries from 2008 to 2023.

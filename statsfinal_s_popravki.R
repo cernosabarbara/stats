@@ -481,26 +481,33 @@ hist(residuals(panel_model_all), breaks=20, prob=TRUE, main="All Countries Resid
 
 
 
-# ---Box-Cox Transformation on Top 6
+# ---- Box-Cox Transformation and Diagnostics for Top-6 ----
 crime_model_top_6_lm <- lm(crime ~ unemployment_ratio + edu_ratio + suspects_cumulative +
-                             cumulative_immigration_pct + socialprotection + socialexclusion,
-                           data = top_6)
-boxcox_result <- boxcox(crime_model_top_6_lm, lambda = seq(-2, 2, 0.1))
-lambda_opt <- boxcox_result$x[which.max(boxcox_result$y)]
-crime_boxcox <- (top_6$crime^lambda_opt - 1)/lambda_opt
+                             cumulative_immigration_pct + socialprotection + socialexclusion, data = top_6)
 
-top_6$crime_transformed <- crime_boxcox
-panel_model_top_6_trans <- plm(crime_transformed ~ unemployment_ratio + edu_ratio + suspects_cumulative +
-                                 cumulative_immigration_pct + socialprotection + socialexclusion,
-                               data = top_6, index = c("geo", "TIME_PERIOD"), model = "within")
-summary(panel_model_top_6_trans)
-bptest(panel_model_top_6_trans)
+boxcox_result_top_6 <- boxcox(crime_model_top_6_lm, lambda = seq(-2, 2, 0.1))
+lambda_opt_top_6 <- boxcox_result_top_6$x[which.max(boxcox_result_top_6$y)]
 
+top_6$crime_transformed <- if (lambda_opt_top_6 == 0) {
+  log(top_6$crime + 0.001)
+} else {
+  ((top_6$crime + 0.001)^lambda_opt_top_6 - 1) / lambda_opt_top_6
+}
 
-# Non top6
+panel_model_top_6_bc <- plm(crime_transformed ~ unemployment_ratio + edu_ratio + suspects_cumulative +
+                              cumulative_immigration_pct + socialprotection + socialexclusion,
+                            data = top_6, index = c("geo", "TIME_PERIOD"), model = "within")
+summary(panel_model_top_6_bc)
+shapiro.test(residuals(panel_model_top_6_bc))
+bptest(panel_model_top_6_bc)
+par(mfrow=c(2,2))
+plot(panel_model_top_6_bc)
+hist(residuals(panel_model_top_6_bc), breaks=20, prob=TRUE, main="Top-6 Residuals (Box-Cox)")
+
+# ---- Box-Cox for Non-Top-6 ----
 crime_model_non_top_6_lm <- lm(crime + 0.001 ~ unemployment_ratio + edu_ratio + suspects_cumulative +
-                                 cumulative_immigration_pct + socialprotection + socialexclusion,
-                               data = non_top_6)
+                                 cumulative_immigration_pct + socialprotection + socialexclusion, data = non_top_6)
+
 boxcox_result_non_top_6 <- boxcox(crime_model_non_top_6_lm, lambda = seq(-2, 2, 0.1))
 lambda_opt_non_top_6 <- boxcox_result_non_top_6$x[which.max(boxcox_result_non_top_6$y)]
 
@@ -513,15 +520,18 @@ non_top_6$crime_transformed <- if (lambda_opt_non_top_6 == 0) {
 panel_model_non_top_6_bc <- plm(crime_transformed ~ unemployment_ratio + edu_ratio + suspects_cumulative +
                                   cumulative_immigration_pct + socialprotection + socialexclusion,
                                 data = non_top_6, index = c("geo", "TIME_PERIOD"), model = "random")
+summary(panel_model_non_top_6_bc)
 
-# Residual diagnostics
 shapiro.test(residuals(panel_model_non_top_6_bc))
 bptest(panel_model_non_top_6_bc)
+par(mfrow=c(2,2))
+plot(panel_model_non_top_6_bc)
+hist(residuals(panel_model_non_top_6_bc), breaks=20, prob=TRUE, main="Non-Top-6 Residuals (Box-Cox)")
 
-# All countries
+# ---- Box-Cox for All Countries ----
 crime_model_all_lm <- lm(crime + 0.001 ~ unemployment_ratio + edu_ratio + suspects_cumulative +
-                           cumulative_immigration_pct + socialprotection + socialexclusion,
-                         data = filtered_data)
+                           cumulative_immigration_pct + socialprotection + socialexclusion, data = filtered_data)
+
 boxcox_result_all <- boxcox(crime_model_all_lm, lambda = seq(-2, 2, 0.1))
 lambda_opt_all <- boxcox_result_all$x[which.max(boxcox_result_all$y)]
 
@@ -535,22 +545,19 @@ panel_model_all_bc <- plm(crime_transformed ~ unemployment_ratio + edu_ratio + s
                             cumulative_immigration_pct + socialprotection + socialexclusion,
                           data = filtered_data, index = c("geo", "TIME_PERIOD"), model = "random")
 
-# Residual diagnostics
+summary(panel_model_all_bc)
 shapiro.test(residuals(panel_model_all_bc))
 bptest(panel_model_all_bc)
-
-# Check residuals
-par(mfrow=c(1,3))
-hist(residuals(panel_model_top_6_log), breaks=20, prob=TRUE, main="Top-6 Residuals")
-hist(residuals(panel_model_non_top_6_log), breaks=20, prob=TRUE, main="Non-Top-6 Residuals")
-hist(residuals(panel_model_all_log), breaks=20, prob=TRUE, main="All Countries Residuals")
+par(mfrow=c(2,2))
+plot(panel_model_all_bc)
+hist(residuals(panel_model_all_bc), breaks=20, prob=TRUE, main="All Countries Residuals (Box-Cox)")
 
 
 
 # Conclusion
-# Using panel models with log-transformed crime to address residual non-normality, I found that in the top-6 countries, higher cumulative foreign suspects, cumulative immigration, and social exclusion were key drivers of crime.
-# For non-top-6 countries, the education ratio was the primary significant predictor, but the model explained only a small portion of crime variance, suggesting other factors matter more. 
-# This shows that immigration-related issues drive crime more in high-crime countries, while non-top-6 countries are more stable.
+# Using panel models with a Box-Cox transfrom to address residual non-normality, I found that in the top-6 countries, higher cumulative foreign suspects, cumulative immigration, and social protection were key in explaining crime.
+# For non-top-6 countries, the education ratio was the primary significant predictor, but the model explained only a small portion of crime variance, suggesting other factors matter more. The low R-squared indicates limited explanatory power, likely due to the differences across all countries and other variables would need to be examined as well. 
+# This shows that immigration-related issues drive crime more in high-crime countries, while non-top-6 countries are more stable. In all countries, immigration and socioeconomic stressors were most predictive, but immigration-related issues were more critical in high-crime countries..
 
 
 
